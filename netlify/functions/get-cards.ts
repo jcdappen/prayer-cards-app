@@ -1,5 +1,61 @@
+
 import type { Handler } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      cards: {
+        Row: {
+          back: string;
+          category: string;
+          created_at: string;
+          front: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          back: string;
+          category: string;
+          created_at?: string;
+          front: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          back?: string;
+          category?: string;
+          created_at?: string;
+          front?: string;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+};
+
 
 const handler: Handler = async (event, context) => {
   const { user } = context.clientContext || {};
@@ -7,7 +63,7 @@ const handler: Handler = async (event, context) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Not authenticated' }) };
   }
 
-  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+  const supabase = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
   const { data, error } = await supabase
     .from('cards')
