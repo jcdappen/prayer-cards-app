@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
@@ -8,25 +7,42 @@ const Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   const handleAuthAction = async (action: 'signIn' | 'signUp') => {
     setLoading(true);
     setMessage('');
     setError('');
+    setDebugInfo('');
+    
+    console.log('Auth action started:', action);
+    console.log('Supabase URL:', supabase.supabaseUrl);
+    
     try {
-      const { error: authError } = action === 'signIn'
+      setDebugInfo('Attempting authentication...');
+      
+      const { data, error: authError } = action === 'signIn'
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
 
-      if (authError) throw authError;
+      console.log('Auth response:', { data, error: authError });
+      setDebugInfo(`Auth response: ${JSON.stringify({ user: data?.user?.id, session: !!data?.session })}`);
+
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
 
       if (action === 'signUp') {
-          setMessage('Sign up successful! You are now logged in.');
+        setMessage('Sign up successful! You are now logged in.');
+      } else {
+        setMessage('Sign in successful!');
       }
-      // For sign-in, the onAuthStateChange listener in App.tsx will handle the redirect.
       
     } catch (err: any) {
-      setError(err.error_description || err.message);
+      console.error('Full error:', err);
+      setError(`Error: ${err.error_description || err.message || 'Unknown error'}`);
+      setDebugInfo(`Error details: ${JSON.stringify(err)}`);
     } finally {
       setLoading(false);
     }
@@ -42,6 +58,7 @@ const Auth: React.FC = () => {
 
         {message && <p className="text-center text-green-600 bg-green-50 p-3 rounded-md">{message}</p>}
         {error && <p className="text-center text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+        {debugInfo && <p className="text-center text-blue-600 bg-blue-50 p-3 rounded-md text-xs">{debugInfo}</p>}
         
         <div className="space-y-6">
           <div>
@@ -91,6 +108,12 @@ const Auth: React.FC = () => {
               {loading ? 'Signing Up...' : 'Sign Up'}
             </button>
           </div>
+        </div>
+        
+        {/* Debug-Informationen */}
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
+          <p><strong>Supabase URL:</strong> {supabase.supabaseUrl}</p>
+          <p><strong>Current URL:</strong> {window.location.origin}</p>
         </div>
       </div>
     </div>
