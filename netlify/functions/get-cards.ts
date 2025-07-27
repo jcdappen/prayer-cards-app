@@ -1,6 +1,6 @@
 
 import type { Handler } from "@netlify/functions";
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Define the database types to fix type inference issues with Supabase client.
 interface Database {
@@ -38,7 +38,7 @@ const handler: Handler = async (event, context) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Not authenticated' }) };
   }
 
-  const supabase = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+  const supabase: SupabaseClient<Database> = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
   const { data, error } = await supabase
     .from('cards')
