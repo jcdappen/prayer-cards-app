@@ -6,30 +6,27 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAuthAction = async (action: 'signIn' | 'signUp') => {
+    setLoading(true);
+    setMessage('');
+    setError('');
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      // Login successful, the App component will re-render due to onAuthStateChange
-    } catch (error: any) {
-      alert(error.error_description || error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      alert('Check your email for the confirmation link!');
-    } catch (error: any) {
-      alert(error.error_description || error.message);
+      const { error: authError } = action === 'signIn'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+
+      if (authError) throw authError;
+
+      if (action === 'signUp') {
+          setMessage('Sign up successful! You are now logged in.');
+      }
+      // For sign-in, the onAuthStateChange listener in App.tsx will handle the redirect.
+      
+    } catch (err: any) {
+      setError(err.error_description || err.message);
     } finally {
       setLoading(false);
     }
@@ -42,7 +39,11 @@ const Auth: React.FC = () => {
           <h1 className="font-serif text-3xl font-bold text-center text-sky-800">Welcome</h1>
           <p className="mt-2 text-center text-gray-600">Sign in to save your prayer cards</p>
         </div>
-        <form className="space-y-6" onSubmit={handleLogin}>
+
+        {message && <p className="text-center text-green-600 bg-green-50 p-3 rounded-md">{message}</p>}
+        {error && <p className="text-center text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+        
+        <div className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email address
@@ -76,22 +77,21 @@ const Auth: React.FC = () => {
           </div>
           <div className="flex flex-col gap-4 pt-2">
             <button
-              type="submit"
+              onClick={() => handleAuthAction('signIn')}
               disabled={loading}
               className="w-full px-4 py-2 font-bold text-white bg-sky-700 rounded-md hover:bg-sky-800 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
             <button
-              type="button"
-              onClick={handleSignup}
+              onClick={() => handleAuthAction('signUp')}
               disabled={loading}
               className="w-full px-4 py-2 font-bold text-sky-700 bg-white border border-sky-700 rounded-md hover:bg-sky-50 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Signing Up...' : 'Sign Up'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
