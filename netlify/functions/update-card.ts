@@ -2,34 +2,38 @@
 import type { Handler } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
 
+type CardsRow = {
+  back: string;
+  category: string;
+  created_at: string;
+  front: string;
+  id: string;
+  user_id: string;
+};
+type CardsInsert = {
+  back: string;
+  category: string;
+  created_at?: string;
+  front: string;
+  id?: string;
+  user_id: string;
+};
+type CardsUpdate = {
+  back?: string;
+  category?: string;
+  created_at?: string;
+  front?: string;
+  id?: string;
+  user_id?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
       cards: {
-        Row: {
-          back: string;
-          category: string;
-          created_at: string;
-          front: string;
-          id: string;
-          user_id: string;
-        };
-        Insert: {
-          back: string;
-          category: string;
-          created_at?: string;
-          front: string;
-          id?: string;
-          user_id: string;
-        };
-        Update: {
-          back?: string;
-          category?: string;
-          created_at?: string;
-          front?: string;
-          id?: string;
-          user_id?: string;
-        };
+        Row: CardsRow;
+        Insert: CardsInsert;
+        Update: CardsUpdate;
       };
     };
     Views: {
