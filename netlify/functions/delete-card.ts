@@ -1,4 +1,3 @@
-
 import type { Handler } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
 
@@ -10,6 +9,7 @@ type CardsRow = {
   id: string;
   user_id: string;
 };
+
 type CardsInsert = {
   back: string;
   category: string;
@@ -18,6 +18,7 @@ type CardsInsert = {
   id?: string;
   user_id: string;
 };
+
 type CardsUpdate = {
   back?: string;
   category?: string;
@@ -52,29 +53,101 @@ export type Database = {
 };
 
 const handler: Handler = async (event, context) => {
-    const { user } = context.clientContext || {};
-    if (!user || !event.body) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Auth or body missing' }) };
+  // CORS Headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
+  }
+
+  // Check for Authorization header
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { 
+      statusCode: 401, 
+      headers,
+      body: JSON.stringify({ error: 'Missing or invalid authorization header' }) 
+    };
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  
+  if (!event.body) {
+    return { 
+      statusCode: 400, 
+      headers,
+      body: JSON.stringify({ error: 'Request body missing' }) 
+    };
+  }
+
+  // Initialize Supabase client
+  const supabase = createClient<Database>(
+    process.env.SUPABASE_URL!, 
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+
+  try {
+    // Verify the JWT token and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return { 
+        statusCode: 401, 
+        headers,
+        body: JSON.stringify({ error: 'Invalid token or user not found' }) 
+      };
     }
 
-    const supabase = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+    // Parse request body
     const { cardId }: { cardId: string; } = JSON.parse(event.body);
     
     if (!cardId) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Card ID is required' }) };
+      return { 
+        statusCode: 400, 
+        headers,
+        body: JSON.stringify({ error: 'Card ID is required' }) 
+      };
     }
 
+    // Delete card
     const { error } = await supabase
-        .from('cards')
-        .delete()
-        .eq('id', cardId)
-        .eq('user_id', user.sub);
+      .from('cards')
+      .delete()
+      .eq('id', cardId)
+      .eq('user_id', user.id);
 
     if (error) {
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+      console.error('Database error:', error);
+      return { 
+        statusCode: 500, 
+        headers,
+        body: JSON.stringify({ error: error.message }) 
+      };
     }
 
-    return { statusCode: 204, body: '' };
+    return { 
+      statusCode: 204, 
+      headers,
+      body: '' 
+    };
+
+  } catch (error) {
+    console.error('Function error:', error);
+    return { 
+      statusCode: 500, 
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' }) 
+    };
+  }
 };
 
 export { handler };

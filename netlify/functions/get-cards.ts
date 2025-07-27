@@ -1,4 +1,3 @@
-
 import type { Handler } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
 
@@ -10,6 +9,7 @@ type CardsRow = {
   id: string;
   user_id: string;
 };
+
 type CardsInsert = {
   back: string;
   category: string;
@@ -18,6 +18,7 @@ type CardsInsert = {
   id?: string;
   user_id: string;
 };
+
 type CardsUpdate = {
   back?: string;
   category?: string;
@@ -51,26 +52,83 @@ export type Database = {
   };
 };
 
-
 const handler: Handler = async (event, context) => {
-  const { user } = context.clientContext || {};
-  if (!user) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Not authenticated' }) };
+  // CORS Headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
-  const supabase = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
-
-  const { data, error } = await supabase
-    .from('cards')
-    .select('*')
-    .eq('user_id', user.sub)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+  // Check for Authorization header
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { 
+      statusCode: 401, 
+      headers,
+      body: JSON.stringify({ error: 'Missing or invalid authorization header' }) 
+    };
   }
 
-  return { statusCode: 200, body: JSON.stringify(data || []) };
+  const token = authHeader.replace('Bearer ', '');
+
+  // Initialize Supabase client
+  const supabase = createClient<Database>(
+    process.env.SUPABASE_URL!, 
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+
+  try {
+    // Verify the JWT token and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return { 
+        statusCode: 401, 
+        headers,
+        body: JSON.stringify({ error: 'Invalid token or user not found' }) 
+      };
+    }
+
+    // Get user's cards
+    const { data, error } = await supabase
+      .from('cards')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Database error:', error);
+      return { 
+        statusCode: 500, 
+        headers,
+        body: JSON.stringify({ error: error.message }) 
+      };
+    }
+
+    return { 
+      statusCode: 200, 
+      headers,
+      body: JSON.stringify(data || []) 
+    };
+
+  } catch (error) {
+    console.error('Function error:', error);
+    return { 
+      statusCode: 500, 
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' }) 
+    };
+  }
 };
 
 export { handler };
