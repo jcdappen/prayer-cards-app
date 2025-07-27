@@ -15,14 +15,20 @@ interface Database {
           category: string;
         };
         Insert: {
+          id?: string;
+          created_at?: string;
           user_id: string;
           front: string;
           back: string;
           category: string;
         };
         Update: {
+          id?: string;
+          created_at?: string;
+          user_id?: string;
           front?: string;
           back?: string;
+          category?: string;
         };
       };
     };
