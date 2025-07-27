@@ -121,3 +121,41 @@ const Auth: React.FC = () => {
 };
 
 export default Auth;
+
+// Fügen Sie diesen Test zu Ihrer Auth.tsx hinzu (temporär)
+
+const testSupabaseConnection = async () => {
+  console.log('=== SUPABASE CONNECTION TEST ===');
+  console.log('URL:', supabase.supabaseUrl);
+  console.log('Window Location:', window.location.href);
+  
+  try {
+    // Test 1: Einfache Anmeldung
+    console.log('Testing signup...');
+    const { data, error } = await supabase.auth.signUp({
+      email: 'test123@gmail.com',
+      password: 'password123'
+    });
+    
+    console.log('Signup result:', { 
+      user: data?.user?.id || 'null',
+      session: data?.session ? 'exists' : 'null',
+      error: error?.message || 'none'
+    });
+    
+    if (error) {
+      console.error('Signup error details:', error);
+    }
+    
+  } catch (err) {
+    console.error('Connection error:', err);
+  }
+};
+
+// Button zu Ihrer Auth.tsx hinzufügen:
+<button 
+  onClick={testSupabaseConnection}
+  className="w-full px-4 py-2 font-bold text-gray-700 bg-yellow-200 rounded-md hover:bg-yellow-300"
+>
+  🔧 Debug Test
+</button>
