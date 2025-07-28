@@ -2,9 +2,10 @@ import React from 'react';
 
 interface CardContentProps {
   text: string;
+  isFront?: boolean;
 }
 
-const CardContent: React.FC<CardContentProps> = ({ text }) => {
+const CardContent: React.FC<CardContentProps> = ({ text, isFront = false }) => {
   const BIBLE_REF_REGEX = /^((\d\s)?[A-Z\s]+(\s\d{1,3}:\d{1,3}(-\d{1,2})?)|([A-Z]+\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(PSALM\s\d{1,3}:\d{1,3})|(GENESIS\s\d{1,3}:\d{1,3})|(LUKE\s\d{1,3}:\d{1,3})|(JOHN\s\d{1,3}:\d{1,3})|(REVELATION\s\d{1,3}:\d{1,3})|(ISAIAH\s\d{1,3}:\d{1,3})|(EXODUS\s\d{1,3}:\d{1,3})|(1\sTHESSALONIANS\s\d{1,3}:\d{1,3})|(1\sPETER\s\d{1,3}:\d{1,3})|(ZEPHANIAH\s\d{1,3}:\d{1,3})|(1\sCHRONICLES\s\d{1,3}:\d{1,3})|(2\sCORINTHIANS\s\d{1,3}:\d{1,3})|(HEBREWS\s\d{1,3}:\d{1,3})|(PHILIPPIANS\s\d{1,3}:\d{1,3})|(PROVERBS\s\d{1,3}:\d{1,3})|(2\sTIMOTHY\s\d{1,3}:\d{1,3})|(ROMANS\s\d{1,3}:\d{1,3})|(1\sSAMUEL\s\d{1,3}:\d{1,3})|(COLOSSIANS\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(DEUTERONOMY\s\d{1,3}:\d{1,3})|(1\sJOHN\s\d{1,3}:\d{1,3})|(JEREMIAH\s\d{1,3}:\d{1,3})|(GALATIANS\s\d{1,3}:\d{1,3})|(MARK\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(MATTHEW\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(NUMBERS\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(LAMENTATIONS\s\d{1,3}:\d{1,3}(-\d{1,2})?)|(JOSHUA\s\d{1,3}:\d{1,3}))$/;
   
   const IS_LIKELY_HEADING_REGEX = /^[A-Z\s&/]+$/;
@@ -13,7 +14,7 @@ const CardContent: React.FC<CardContentProps> = ({ text }) => {
     pMargin: 'my-1',
     h2Margin: 'my-1',
     h3Margin: 'my-2',
-    lineHeight: 'leading-snug',
+    lineHeight: isFront ? 'leading-tight' : 'leading-snug',
   };
 
   const content = text.split('\n').map((line, index) => {

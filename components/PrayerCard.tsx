@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PrayerCardType } from '../types';
 import { CATEGORIES } from '../constants';
@@ -25,7 +24,7 @@ const PrayerCard: React.FC<PrayerCardProps> = ({ card, isFlipped, onClick }) => 
             {card.frontHeadline}
           </div>
           <div className="flex-grow p-4 md:p-6 overflow-y-auto bg-base flex flex-col justify-center">
-            <CardContent text={card.frontText} />
+            <CardContent text={card.frontText} isFront={true} />
           </div>
           <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider`}>
              {card.category}
