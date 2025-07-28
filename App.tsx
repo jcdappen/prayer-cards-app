@@ -10,6 +10,7 @@ import ArrowLeftIcon from './components/icons/ArrowLeftIcon';
 import ArrowRightIcon from './components/icons/ArrowRightIcon';
 import HomeIcon from './components/icons/HomeIcon';
 import ShuffleIcon from './components/icons/ShuffleIcon';
+import StarIcon from './components/icons/StarIcon';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
@@ -19,14 +20,12 @@ const App: React.FC = () => {
       if (storedUserCardsJSON) {
         const storedUserCards = JSON.parse(storedUserCardsJSON);
         if (Array.isArray(storedUserCards)) {
-          // To be safe, filter for valid cards that belong to the user
           const validUserCards = storedUserCards.filter(c => c && c.id && c.category === 'MY CARDS');
           return [...initialPrayerCards, ...validUserCards];
         }
       }
     } catch (error) {
       console.error("Failed to load user cards from localStorage", error);
-      // Fall through to return initial cards
     }
     return initialPrayerCards;
   });
@@ -34,8 +33,22 @@ const App: React.FC = () => {
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<number | string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [favoriteCardIds, setFavoriteCardIds] = useState<Set<string | number>>(() => {
+    try {
+        const storedFavorites = localStorage.getItem('favorite-card-ids');
+        if (storedFavorites) {
+            const ids = JSON.parse(storedFavorites);
+            if (Array.isArray(ids)) {
+                return new Set(ids);
+            }
+        }
+    } catch (e) {
+        console.error("Could not load favorites", e);
+    }
+    return new Set();
+  });
 
-  // Effect to save only user-created cards to localStorage whenever 'cards' state changes
+
   useEffect(() => {
     try {
       const userCards = cards.filter(card => card.category === 'MY CARDS');
@@ -45,31 +58,47 @@ const App: React.FC = () => {
     }
   }, [cards]);
 
+  useEffect(() => {
+    try {
+        const ids = Array.from(favoriteCardIds);
+        localStorage.setItem('favorite-card-ids', JSON.stringify(ids));
+    } catch (e) {
+        console.error("Could not save favorites", e);
+    }
+  }, [favoriteCardIds]);
+
+
+  const cardsByCategory = useMemo(() => {
+    const grouped = cards.reduce((acc, card) => {
+      (acc[card.category] = acc[card.category] || []).push(card);
+      return acc;
+    }, {} as { [key: string]: PrayerCardType[] });
+
+    // Add favorites as a special category group
+    grouped['FAVORITES'] = cards.filter(card => favoriteCardIds.has(card.id));
+    
+    return grouped;
+  }, [cards, favoriteCardIds]);
+
 
   const dynamicCategories = useMemo(() => {
     const counts = cards.reduce((acc, card) => {
         acc[card.category] = (acc[card.category] || 0) + 1;
         return acc;
     }, {} as {[key: string]: number});
+    
+    counts['FAVORITES'] = favoriteCardIds.size;
 
     return Object.keys(CATEGORIES).reduce((acc, key) => {
         const catInfo = CATEGORIES[key];
         const count = counts[key] || 0;
         
-        // Display a category if it has cards, OR if it's "MY CARDS".
         if (count > 0 || key === 'MY CARDS') {
           acc[key] = { ...catInfo, cardCount: count };
         }
         return acc;
     }, {} as {[key: string]: CategoryInfo});
-  }, [cards]);
-
-  const cardsByCategory = useMemo(() => {
-    return cards.reduce((acc, card) => {
-      (acc[card.category] = acc[card.category] || []).push(card);
-      return acc;
-    }, {} as { [key: string]: PrayerCardType[] });
-  }, [cards]);
+  }, [cards, favoriteCardIds]);
 
   const currentCategoryCards = useMemo(() => {
     if (!selectedCategoryName) return [];
@@ -119,6 +148,18 @@ const App: React.FC = () => {
     const randomCard = allCards[randomIndex];
     handleSelectCard(randomCard.id, randomCard.category);
   };
+  
+  const handleToggleFavorite = useCallback((cardId: string | number) => {
+    setFavoriteCardIds(prevIds => {
+        const newIds = new Set(prevIds);
+        if (newIds.has(cardId)) {
+            newIds.delete(cardId);
+        } else {
+            newIds.add(cardId);
+        }
+        return newIds;
+    });
+  }, []);
 
   const handleCreateCard = (newCardData: { headline: string; front: string; back: string }) => {
     const newCard: PrayerCardType = {
@@ -151,18 +192,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-        if (view === 'card') {
+        if (view === 'card' && currentCard) {
             if (event.key === 'ArrowRight') handleNextCard();
             if (event.key === 'ArrowLeft') handlePrevCard();
             if (event.key === ' ') {
                 event.preventDefault(); // Prevent scrolling
                 setIsFlipped(f => !f);
             }
+            if (event.key === 'f') {
+                handleToggleFavorite(currentCard.id)
+            }
         }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, handleNextCard, handlePrevCard]);
+  }, [view, handleNextCard, handlePrevCard, currentCard, handleToggleFavorite]);
 
 
   const renderHome = () => (
@@ -202,6 +246,13 @@ const App: React.FC = () => {
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
         {Object.entries(dynamicCategories)
+          .sort(([keyA], [keyB]) => {
+            if (keyA === 'FAVORITES') return -1;
+            if (keyB === 'FAVORITES') return 1;
+            if (keyA === 'MY CARDS') return 1;
+            if (keyB === 'MY CARDS') return -1;
+            return 0;
+          })
           .map(([key, catInfo]) => (
             <CategoryTile key={catInfo.name} categoryInfo={catInfo} onClick={() => handleSelectCategory(key)} />
         ))}
@@ -219,7 +270,7 @@ const App: React.FC = () => {
             <h1 className="font-serif text-4xl font-bold text-center mb-8">{categoryInfo?.name}</h1>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-7xl mx-auto">
                 {currentCategoryCards.map(card => {
-                    const cardCategoryInfo = dynamicCategories[card.category];
+                    const cardCategoryInfo = CATEGORIES[card.category];
                     return (
                         <button
                             key={card.id}
@@ -230,12 +281,18 @@ const App: React.FC = () => {
                         </button>
                     );
                 })}
-                 {currentCategoryCards.length === 0 && (
+                 {currentCategoryCards.length === 0 && selectedCategoryName === 'MY CARDS' && (
                     <div className="col-span-full text-center text-gray-500 py-10">
                         <p>You haven't created any cards in this category yet.</p>
                         <button onClick={() => setView('create')} className="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700">
                             Create a Card
                         </button>
+                    </div>
+                )}
+                {currentCategoryCards.length === 0 && selectedCategoryName === 'FAVORITES' && (
+                    <div className="col-span-full text-center text-gray-500 py-10">
+                        <p>You haven't marked any cards as favorites yet.</p>
+                        <p className="text-sm mt-1">Click the star icon on any card to add it here.</p>
                     </div>
                 )}
             </div>
@@ -247,16 +304,27 @@ const App: React.FC = () => {
     if (!currentCard) return <div>Card not found</div>;
     const isFirstCard = currentCardIndex === 0;
     const isLastCard = currentCardIndex === currentCategoryCards.length - 1;
+    const isFavorite = favoriteCardIds.has(currentCard.id);
 
     return (
         <div className="min-h-screen flex flex-col p-4">
             <header className="flex justify-between items-center mb-4 w-full max-w-md mx-auto">
                 <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-black">
-                    <ArrowLeftIcon className="h-5 w-5" /> Back to Category
+                    <ArrowLeftIcon className="h-5 w-5" /> Back
                 </button>
-                <button onClick={handleGoHome} className="text-gray-600 hover:text-black">
-                    <HomeIcon className="h-6 w-6" />
-                </button>
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => handleToggleFavorite(currentCard.id)} 
+                        className={`p-1 rounded-full transition-colors ${isFavorite ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-400 hover:text-yellow-400'}`}
+                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        title={isFavorite ? 'Remove from favorites (f)' : 'Add to favorites (f)'}
+                        >
+                        <StarIcon className="h-7 w-7" filled={isFavorite} />
+                    </button>
+                    <button onClick={handleGoHome} className="text-gray-600 hover:text-black" title="Go to Home screen">
+                        <HomeIcon className="h-6 w-6" />
+                    </button>
+                </div>
             </header>
             <div className="flex-grow flex items-center justify-center">
                 <div className="w-full max-w-md flex items-center gap-2">

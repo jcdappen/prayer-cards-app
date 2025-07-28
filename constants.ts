@@ -10,5 +10,6 @@ export const CATEGORIES: { [key: string]: Omit<CategoryInfo, 'cardCount'> } = {
   'BIBLICAL PRAYERS': { name: 'Biblical Prayers', color: 'bg-biblical', textColor: 'text-biblical' },
   'MEDITATIONS': { name: 'Meditations', color: 'bg-meditations', textColor: 'text-meditations' },
   'ONE-SENTENCE PRAYERS': { name: 'One-Sentence Prayers', color: 'bg-one-sentence', textColor: 'text-one-sentence' },
+  'FAVORITES': { name: 'Favorites', color: 'bg-yellow-500', textColor: 'text-yellow-500' },
   'MY CARDS': { name: 'My Cards', color: 'bg-gray-500', textColor: 'text-gray-500' },
 };
