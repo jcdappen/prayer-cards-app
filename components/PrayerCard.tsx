@@ -15,7 +15,7 @@ const PrayerCard: React.FC<PrayerCardProps> = ({ card, isFlipped, onClick }) => 
   const cardColor = categoryInfo ? categoryInfo.color : 'bg-gray-400';
 
   return (
-    <div className="w-full aspect-[3/4.5] perspective-1000" onClick={onClick}>
+    <div className="w-full aspect-[3/5] perspective-1000" onClick={onClick}>
       <div
         className={`relative w-full h-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}
       >
