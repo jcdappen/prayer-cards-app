@@ -44,12 +44,12 @@ const CardContent: React.FC<CardContentProps> = ({ text }) => {
        const isLikelyPrayer = trimmedLine.includes('Jesus') || trimmedLine.includes('Lord') || trimmedLine.includes('God') || trimmedLine.includes('Father');
        // This handles short list items like "You are holy." or "Vastness of Creation"
        if (!isLikelyPrayer) {
-         return <p key={index} className="text-center text-lg my-1 leading-normal">{trimmedLine}</p>;
+         return <p key={index} className="text-center text-lg my-2 leading-relaxed">{trimmedLine}</p>;
        }
     }
 
     // Default Rule: Scripture text, prayers, and longer sentences are italic.
-    return <p key={index} className="text-center text-lg my-1 italic leading-normal">{trimmedLine}</p>;
+    return <p key={index} className="text-center text-lg my-2 italic leading-relaxed">{trimmedLine}</p>;
   }).filter(Boolean);
 
   return <>{content}</>;

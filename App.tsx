@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { initialPrayerCards } from './data';
 import { CATEGORIES } from './constants';
@@ -5,10 +6,6 @@ import type { PrayerCardType, CategoryInfo, View } from './types';
 import CategoryTile from './components/CategoryTile';
 import PrayerCard from './components/PrayerCard';
 import CreateCardForm from './components/CreateCardForm';
-import Auth from './components/Auth';
-import { auth } from './firebaseClient';
-import type { User } from 'firebase/auth';
-
 import ArrowLeftIcon from './components/icons/ArrowLeftIcon';
 import ArrowRightIcon from './components/icons/ArrowRightIcon';
 import HomeIcon from './components/icons/HomeIcon';
@@ -16,48 +13,10 @@ import ShuffleIcon from './components/icons/ShuffleIcon';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  
   const [cards, setCards] = useState<PrayerCardType[]>(initialPrayerCards);
-  
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
-  const [selectedCardId, setSelectedCardId] = useState<number | string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-
-  const fetchUserCards = useCallback(async (user: User) => {
-    setStatusMessage('Loading your cards...');
-    try {
-      const token = await user.getIdToken();
-      const response = await fetch('/.netlify/functions/get-cards', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Failed to fetch cards');
-      const userCards = await response.json();
-      setCards([...initialPrayerCards, ...userCards]);
-    } catch (error) {
-      console.error(error);
-      setStatusMessage('Error loading cards.');
-    } finally {
-      setStatusMessage('');
-    }
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setCurrentUser(user);
-      if (user) {
-        fetchUserCards(user);
-      } else {
-        // When user logs out, reset cards to initial state
-        setCards(initialPrayerCards);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [fetchUserCards]);
-
 
   const dynamicCategories = useMemo(() => {
     const counts = cards.reduce((acc, card) => {
@@ -97,7 +56,7 @@ const App: React.FC = () => {
     setView('category');
   };
   
-  const handleSelectCard = (cardId: number | string, categoryName: string) => {
+  const handleSelectCard = (cardId: number, categoryName: string) => {
     setSelectedCategoryName(categoryName);
     setSelectedCardId(cardId);
     setIsFlipped(false);
@@ -114,86 +73,26 @@ const App: React.FC = () => {
     if (view === 'card') {
       setView('category');
       setSelectedCardId(null);
-    } else if (view === 'category' || view === 'create' || view === 'edit') {
+    } else if (view === 'category' || view === 'create') {
       handleGoHome();
     }
   };
   
   const handleShuffle = () => {
-    const allCards = cards.filter(c => c.category !== 'MY CARDS');
-    if (allCards.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * allCards.length);
-    const randomCard = allCards[randomIndex];
+    const randomIndex = Math.floor(Math.random() * cards.length);
+    const randomCard = cards[randomIndex];
     handleSelectCard(randomCard.id, randomCard.category);
   };
 
-  const handleCreateCard = async (newCardData: { front: string; back: string }) => {
-    if (!currentUser) return alert("Please log in to create a card.");
-    setStatusMessage('Saving card...');
-    try {
-        const token = await currentUser.getIdToken();
-        const response = await fetch('/.netlify/functions/create-card', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify(newCardData),
-        });
-        if (!response.ok) throw new Error('Failed to create card');
-        await fetchUserCards(currentUser);
-        setView('category');
-        setSelectedCategoryName('MY CARDS');
-    } catch (error) {
-        console.error(error);
-        setStatusMessage('Error saving card.');
-    }
-  };
-
-  const handleStartEdit = () => {
-    if (currentCard) setView('edit');
-  };
-
-  const handleUpdateCard = async (updatedData: { front: string; back: string }) => {
-    if (!selectedCardId || !currentUser) return;
-    setStatusMessage('Updating card...');
-    try {
-        const token = await currentUser.getIdToken();
-        const response = await fetch('/.netlify/functions/update-card', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ cardId: selectedCardId, ...updatedData }),
-        });
-        if (!response.ok) throw new Error('Failed to update card');
-        await fetchUserCards(currentUser);
-        setView('card');
-    } catch (error) {
-        console.error(error);
-        setStatusMessage('Error updating card.');
-    }
-  };
-
-  const handleDeleteCard = async () => {
-    if (!currentCard || typeof currentCard.id !== 'string' || !currentUser) return;
-    if (window.confirm("Are you sure you want to delete this card?")) {
-        setStatusMessage('Deleting card...');
-        try {
-            const token = await currentUser.getIdToken();
-            const response = await fetch('/.netlify/functions/delete-card', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ cardId: currentCard.id }),
-            });
-            if (!response.ok) throw new Error('Failed to delete card');
-            await fetchUserCards(currentUser);
-            handleBack();
-        } catch(error) {
-            console.error(error);
-            setStatusMessage('Error deleting card.');
-        }
-    }
-  };
-
-  const handleSignOut = async () => {
-    await auth.signOut();
-    handleGoHome();
+  const handleCreateCard = (newCardData: { front: string; back: string }) => {
+    const newCard: PrayerCardType = {
+        id: Date.now(), // Simple unique ID
+        category: 'MY CARDS',
+        ...newCardData,
+    };
+    setCards(prevCards => [...prevCards, newCard]);
+    setSelectedCategoryName('MY CARDS');
+    setView('category');
   };
   
   const handleNextCard = useCallback(() => {
@@ -201,14 +100,14 @@ const App: React.FC = () => {
         const nextCard = currentCategoryCards[currentCardIndex + 1];
         handleSelectCard(nextCard.id, nextCard.category);
     }
-  }, [currentCardIndex, currentCategoryCards, handleSelectCard]);
+  }, [currentCardIndex, currentCategoryCards]);
   
   const handlePrevCard = useCallback(() => {
     if(currentCardIndex > 0){
         const prevCard = currentCategoryCards[currentCardIndex - 1];
         handleSelectCard(prevCard.id, prevCard.category);
     }
-  }, [currentCardIndex, currentCategoryCards, handleSelectCard]);
+  }, [currentCardIndex, currentCategoryCards]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -221,27 +120,24 @@ const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [view, handleNextCard, handlePrevCard]);
-  
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen"><div>Loading...</div></div>;
-  }
 
-  if (!currentUser) {
-    return <Auth />;
-  }
 
   const renderHome = () => (
     <div className="p-4 md:p-8">
-      <header className="text-center mb-8 relative">
-        <div className="absolute top-0 right-0 text-right">
-          <p className="text-sm text-gray-600">Signed in as</p>
-          <p className="font-semibold text-gray-800">{currentUser.email}</p>
-          <button onClick={handleSignOut} className="mt-1 text-sm bg-red-500 text-white py-1 px-3 rounded-md hover:bg-red-600">Sign Out</button>
-        </div>
+      <header className="text-center mb-8">
         <h1 className="font-serif text-5xl font-bold text-sky-800">Lead With Prayer</h1>
         <p className="text-lg text-gray-600 mt-2">Digital Prayer Cards</p>
       </header>
       
+      <div className="max-w-4xl mx-auto bg-white p-6 shadow-lg mb-8">
+        <h2 className="font-serif text-2xl font-bold mb-4">How to Use These Cards</h2>
+        <div className="space-y-3 text-gray-700">
+            <p><strong>1. Slower is better.</strong> Slow down to experience, not read.</p>
+            <p><strong>2. Practice the Rule of Five.</strong> Read each verse and each line of each prayer five times. Let the words soak into your spirit.</p>
+            <p><strong>3. Practice posture.</strong> Some prayers inspire raised hands or bent knees. Some might encourage you to pray loudly or in a whisper. Engage your heart, soul, mind, and body.</p>
+        </div>
+      </div>
+
        <div className="flex justify-center gap-4 my-8">
             <button
                 onClick={handleShuffle}
@@ -262,7 +158,7 @@ const App: React.FC = () => {
         </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-        {Object.entries(dynamicCategories).filter(([,cat]) => cat.cardCount > 0).map(([key, catInfo]) => (
+        {Object.entries(dynamicCategories).map(([key, catInfo]) => (
           <CategoryTile key={key} categoryInfo={catInfo} onClick={() => handleSelectCategory(key)} />
         ))}
       </div>
@@ -309,26 +205,14 @@ const App: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col p-4">
-            <header className="flex justify-between items-center mb-2 w-full max-w-md mx-auto">
-                <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-black p-2 rounded-md">
-                    <ArrowLeftIcon className="h-5 w-5" /> Back
+            <header className="flex justify-between items-center mb-4 w-full max-w-md mx-auto">
+                <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-black">
+                    <ArrowLeftIcon className="h-5 w-5" /> Back to Category
                 </button>
-                <button onClick={handleGoHome} className="text-gray-600 hover:text-black p-2 rounded-md">
+                <button onClick={handleGoHome} className="text-gray-600 hover:text-black">
                     <HomeIcon className="h-6 w-6" />
                 </button>
             </header>
-            
-            {currentCard.category === 'MY CARDS' && (
-                <div className="flex justify-center gap-4 mb-2 w-full max-w-md mx-auto">
-                    <button onClick={handleStartEdit} className="text-sm text-blue-600 hover:text-blue-800 font-semibold py-1 px-3 rounded-md bg-blue-100 hover:bg-blue-200">
-                        Edit
-                    </button>
-                    <button onClick={handleDeleteCard} className="text-sm text-red-600 hover:text-red-800 font-semibold py-1 px-3 rounded-md bg-red-100 hover:bg-red-200">
-                        Delete
-                    </button>
-                </div>
-            )}
-
             <div className="flex-grow flex items-center justify-center">
                 <div className="w-full max-w-md flex items-center gap-2">
                     <button onClick={handlePrevCard} disabled={isFirstCard} className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
@@ -350,31 +234,11 @@ const App: React.FC = () => {
   };
 
   const renderCreate = () => (
-      <CreateCardForm
-        mode="create"
+      <CreateCardForm 
         onSave={handleCreateCard}
         onCancel={handleBack}
       />
   );
-
-  const renderEdit = () => {
-      const cardToEdit = cards.find(c => c.id === selectedCardId);
-      if (!cardToEdit) {
-          return <div>Card not found. <button onClick={handleBack}>Go back</button></div>;
-      }
-      return (
-        <CreateCardForm
-          mode="edit"
-          initialData={{ front: cardToEdit.front, back: cardToEdit.back }}
-          onSave={handleUpdateCard}
-          onCancel={() => setView('card')}
-        />
-      );
-  };
-  
-  if (statusMessage) {
-    return <div className="flex justify-center items-center h-screen"><div>{statusMessage}</div></div>;
-  }
   
   switch (view) {
     case 'category':
@@ -383,8 +247,6 @@ const App: React.FC = () => {
       return renderCard();
     case 'create':
       return renderCreate();
-    case 'edit':
-        return renderEdit();
     case 'home':
     default:
       return renderHome();

@@ -1,11 +1,9 @@
 
 export interface PrayerCardType {
-  id: number | string;
+  id: number;
   category: string;
   front: string;
   back: string;
-  created_at?: string;
-  user_id?: string;
 }
 
 export interface CategoryInfo {
@@ -15,4 +13,4 @@ export interface CategoryInfo {
   cardCount: number;
 }
 
-export type View = 'home' | 'category' | 'card' | 'create' | 'edit';
+export type View = 'home' | 'category' | 'card' | 'create';
