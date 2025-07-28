@@ -3,24 +3,25 @@ import React, { useState } from 'react';
 import ArrowLeftIcon from './icons/ArrowLeftIcon';
 
 interface CreateCardFormProps {
-  onSave: (cardData: { front: string; back: string }) => void;
+  onSave: (cardData: { headline: string; front: string; back: string }) => void;
   onCancel: () => void;
 }
 
 const CreateCardForm: React.FC<CreateCardFormProps> = ({ onSave, onCancel }) => {
+  const [headline, setHeadline] = useState('');
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (front.trim() && back.trim()) {
-      onSave({ front, back });
+    if (headline.trim() && front.trim() && back.trim()) {
+      onSave({ headline, front, back });
     } else {
-      alert('Please fill out both front and back of the card.');
+      alert('Please fill out the headline and both sides of the card.');
     }
   };
 
-  const commonTextareaStyles = "w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-shadow";
+  const commonInputStyles = "w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-shadow";
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
@@ -31,6 +32,20 @@ const CreateCardForm: React.FC<CreateCardFormProps> = ({ onSave, onCancel }) => 
         <h1 className="font-serif text-4xl font-bold text-center mb-8">Create a New Prayer Card</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
+            <label htmlFor="headline" className="block text-lg font-semibold text-gray-700 mb-2">
+              Card Headline
+            </label>
+            <input
+              id="headline"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              className={commonInputStyles}
+              placeholder="Enter a title for your card..."
+              required
+            />
+            <p className="text-sm text-gray-500 mt-1">This will be shown in the category list.</p>
+          </div>
+          <div>
             <label htmlFor="front-content" className="block text-lg font-semibold text-gray-700 mb-2">
               Front Content
             </label>
@@ -39,8 +54,9 @@ const CreateCardForm: React.FC<CreateCardFormProps> = ({ onSave, onCancel }) => 
               value={front}
               onChange={(e) => setFront(e.target.value)}
               rows={8}
-              className={commonTextareaStyles}
-              placeholder="Enter the prayer, scripture, or title for the front of the card..."
+              className={commonInputStyles}
+              placeholder="Enter the prayer, scripture, or text for the front of the card..."
+              required
             />
           </div>
           <div>
@@ -52,8 +68,9 @@ const CreateCardForm: React.FC<CreateCardFormProps> = ({ onSave, onCancel }) => 
               value={back}
               onChange={(e) => setBack(e.target.value)}
               rows={8}
-              className={commonTextareaStyles}
-              placeholder="Enter reflection points, attributes, or related prayers for the back..."
+              className={commonInputStyles}
+              placeholder="Enter reflection points, tasks, or related text for the back..."
+              required
             />
             <p className="text-sm text-gray-500 mt-2">All new cards will be saved to the "My Cards" category.</p>
           </div>

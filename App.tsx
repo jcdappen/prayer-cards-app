@@ -13,10 +13,38 @@ import ShuffleIcon from './components/icons/ShuffleIcon';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
-  const [cards, setCards] = useState<PrayerCardType[]>(initialPrayerCards);
+  const [cards, setCards] = useState<PrayerCardType[]>(() => {
+    try {
+      const storedUserCardsJSON = localStorage.getItem('my-prayer-cards');
+      if (storedUserCardsJSON) {
+        const storedUserCards = JSON.parse(storedUserCardsJSON);
+        if (Array.isArray(storedUserCards)) {
+          // To be safe, filter for valid cards that belong to the user
+          const validUserCards = storedUserCards.filter(c => c && c.id && c.category === 'MY CARDS');
+          return [...initialPrayerCards, ...validUserCards];
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load user cards from localStorage", error);
+      // Fall through to return initial cards
+    }
+    return initialPrayerCards;
+  });
+  
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
-  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<number | string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
+
+  // Effect to save only user-created cards to localStorage whenever 'cards' state changes
+  useEffect(() => {
+    try {
+      const userCards = cards.filter(card => card.category === 'MY CARDS');
+      localStorage.setItem('my-prayer-cards', JSON.stringify(userCards));
+    } catch (error) {
+      console.error("Failed to save user cards to localStorage", error);
+    }
+  }, [cards]);
+
 
   const dynamicCategories = useMemo(() => {
     const counts = cards.reduce((acc, card) => {
@@ -24,8 +52,14 @@ const App: React.FC = () => {
         return acc;
     }, {} as {[key: string]: number});
 
-    return Object.entries(CATEGORIES).reduce((acc, [key, catInfo]) => {
-        acc[key] = { ...catInfo, cardCount: counts[key] || 0 };
+    return Object.keys(CATEGORIES).reduce((acc, key) => {
+        const catInfo = CATEGORIES[key];
+        const count = counts[key] || 0;
+        
+        // Display a category if it has cards, OR if it's "MY CARDS".
+        if (count > 0 || key === 'MY CARDS') {
+          acc[key] = { ...catInfo, cardCount: count };
+        }
         return acc;
     }, {} as {[key: string]: CategoryInfo});
   }, [cards]);
@@ -51,12 +85,12 @@ const App: React.FC = () => {
     return currentCategoryCards.findIndex(c => c.id === currentCard.id);
   }, [currentCard, currentCategoryCards, selectedCategoryName]);
 
-  const handleSelectCategory = (categoryName: string) => {
-    setSelectedCategoryName(categoryName);
+  const handleSelectCategory = (categoryKey: string) => {
+    setSelectedCategoryName(categoryKey);
     setView('category');
   };
   
-  const handleSelectCard = (cardId: number, categoryName: string) => {
+  const handleSelectCard = (cardId: number | string, categoryName: string) => {
     setSelectedCategoryName(categoryName);
     setSelectedCardId(cardId);
     setIsFlipped(false);
@@ -79,16 +113,22 @@ const App: React.FC = () => {
   };
   
   const handleShuffle = () => {
-    const randomIndex = Math.floor(Math.random() * cards.length);
-    const randomCard = cards[randomIndex];
+    const allCards = Object.values(cards).flat();
+    if (allCards.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * allCards.length);
+    const randomCard = allCards[randomIndex];
     handleSelectCard(randomCard.id, randomCard.category);
   };
 
-  const handleCreateCard = (newCardData: { front: string; back: string }) => {
+  const handleCreateCard = (newCardData: { headline: string; front: string; back: string }) => {
     const newCard: PrayerCardType = {
-        id: Date.now(), // Simple unique ID
+        id: `user-${Date.now()}`,
         category: 'MY CARDS',
-        ...newCardData,
+        frontHeadline: newCardData.headline,
+        frontText: newCardData.front,
+        backHeadline: newCardData.headline,
+        backTask: '',
+        backText: newCardData.back,
     };
     setCards(prevCards => [...prevCards, newCard]);
     setSelectedCategoryName('MY CARDS');
@@ -114,7 +154,10 @@ const App: React.FC = () => {
         if (view === 'card') {
             if (event.key === 'ArrowRight') handleNextCard();
             if (event.key === 'ArrowLeft') handlePrevCard();
-            if (event.key === ' ') setIsFlipped(f => !f);
+            if (event.key === ' ') {
+                event.preventDefault(); // Prevent scrolling
+                setIsFlipped(f => !f);
+            }
         }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -158,45 +201,47 @@ const App: React.FC = () => {
         </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-        {Object.entries(dynamicCategories).map(([key, catInfo]) => (
-          <CategoryTile key={key} categoryInfo={catInfo} onClick={() => handleSelectCategory(key)} />
+        {Object.entries(dynamicCategories)
+          .map(([key, catInfo]) => (
+            <CategoryTile key={catInfo.name} categoryInfo={catInfo} onClick={() => handleSelectCategory(key)} />
         ))}
       </div>
     </div>
   );
 
-  const renderCategory = () => (
-    <div className="p-4 md:p-8">
-        <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-black mb-6">
-            <ArrowLeftIcon className="h-5 w-5" /> Back to Home
-        </button>
-        <h1 className="font-serif text-4xl font-bold text-center mb-8">{selectedCategoryName}</h1>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-7xl mx-auto">
-            {currentCategoryCards.map(card => {
-                const categoryInfo = dynamicCategories[card.category];
-                return (
-                    <div key={card.id} onClick={() => handleSelectCard(card.id, card.category)} className="cursor-pointer aspect-[3/4.5] bg-white shadow-md hover:shadow-xl hover:-translate-y-1 transition-transform flex flex-col justify-between p-2">
-                       <div className={`p-1 text-white text-center font-bold uppercase text-xs tracking-wider ${categoryInfo.color}`}>
-                          {card.category}
-                        </div>
-                        <p className="text-center font-serif text-sm flex-grow flex items-center justify-center p-2">{card.front.split('\n')[0]}</p>
-                        <div className={`p-1 text-white text-center font-bold uppercase text-xs tracking-wider ${categoryInfo.color}`}>
-                           {card.id}
-                        </div>
+  const renderCategory = () => {
+    const categoryInfo = dynamicCategories[selectedCategoryName || ''];
+    return (
+        <div className="p-4 md:p-8">
+            <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-black mb-6">
+                <ArrowLeftIcon className="h-5 w-5" /> Back to Home
+            </button>
+            <h1 className="font-serif text-4xl font-bold text-center mb-8">{categoryInfo?.name}</h1>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-7xl mx-auto">
+                {currentCategoryCards.map(card => {
+                    const cardCategoryInfo = dynamicCategories[card.category];
+                    return (
+                        <button
+                            key={card.id}
+                            onClick={() => handleSelectCard(card.id, card.category)}
+                            className={`w-full h-28 p-3 text-white font-bold rounded-lg shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-transform duration-300 flex items-center justify-center text-center leading-tight ${cardCategoryInfo?.color || 'bg-gray-400'}`}
+                        >
+                           {card.frontHeadline}
+                        </button>
+                    );
+                })}
+                 {currentCategoryCards.length === 0 && (
+                    <div className="col-span-full text-center text-gray-500 py-10">
+                        <p>You haven't created any cards in this category yet.</p>
+                        <button onClick={() => setView('create')} className="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700">
+                            Create a Card
+                        </button>
                     </div>
-                );
-            })}
-             {currentCategoryCards.length === 0 && (
-                <div className="col-span-full text-center text-gray-500 py-10">
-                    <p>You haven't created any cards in this category yet.</p>
-                    <button onClick={() => setView('create')} className="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700">
-                        Create a Card
-                    </button>
-                </div>
-            )}
+                )}
+            </div>
         </div>
-    </div>
-  );
+    );
+  }
 
   const renderCard = () => {
     if (!currentCard) return <div>Card not found</div>;

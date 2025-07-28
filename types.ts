@@ -1,9 +1,12 @@
 
 export interface PrayerCardType {
-  id: number;
+  id: number | string;
   category: string;
-  front: string;
-  back: string;
+  frontHeadline: string;
+  frontText: string;
+  backHeadline: string;
+  backTask: string;
+  backText: string;
 }
 
 export interface CategoryInfo {

@@ -9,6 +9,13 @@ const CardContent: React.FC<CardContentProps> = ({ text }) => {
   
   const IS_LIKELY_HEADING_REGEX = /^[A-Z\s&/]+$/;
 
+  const spacing = {
+    pMargin: 'my-1',
+    h2Margin: 'my-1',
+    h3Margin: 'my-2',
+    lineHeight: 'leading-snug',
+  };
+
   const content = text.split('\n').map((line, index) => {
     const trimmedLine = line.trim();
     if (!trimmedLine) return null;
@@ -20,22 +27,22 @@ const CardContent: React.FC<CardContentProps> = ({ text }) => {
     
     // Rule 2: Subtitles in brackets
     if (trimmedLine.startsWith('[') && trimmedLine.endsWith(']')) {
-        return <h3 key={index} className="font-serif text-2xl text-center font-bold my-4">{trimmedLine.replace(/\[|\]/g, '')}</h3>;
+        return <h3 key={index} className={`font-serif text-2xl text-center font-bold ${spacing.h3Margin}`}>{trimmedLine.replace(/\[|\]/g, '')}</h3>;
     }
     
     // Rule 3: Main Titles (single, all-caps word)
     if (index < 2 && IS_LIKELY_HEADING_REGEX.test(trimmedLine) && !trimmedLine.includes(' ') && trimmedLine.length < 20) {
-        return <h2 key={index} className="font-serif text-4xl text-center font-bold my-2">{trimmedLine}</h2>;
+        return <h2 key={index} className={`font-serif text-4xl text-center font-bold ${spacing.h2Margin}`}>{trimmedLine}</h2>;
     }
 
     // Rule 4: Other ALL-CAPS headings
     if (IS_LIKELY_HEADING_REGEX.test(trimmedLine) && trimmedLine.length > 3) {
-      return <h3 key={index} className="font-serif text-2xl text-center font-bold my-4">{trimmedLine}</h3>;
+      return <h3 key={index} className={`font-serif text-2xl text-center font-bold ${spacing.h3Margin}`}>{trimmedLine}</h3>;
     }
 
     // Rule 5: Instructions in parentheses
     if (trimmedLine.startsWith('(') && trimmedLine.endsWith(')')) {
-        return <p key={index} className="text-center text-sm my-2 italic text-gray-500">{trimmedLine}</p>;
+        return <p key={index} className={`text-center text-sm ${spacing.pMargin} italic text-gray-500`}>{trimmedLine}</p>;
     }
 
     // Rule 6: Heuristic for list items (render as normal text)
@@ -44,12 +51,12 @@ const CardContent: React.FC<CardContentProps> = ({ text }) => {
        const isLikelyPrayer = trimmedLine.includes('Jesus') || trimmedLine.includes('Lord') || trimmedLine.includes('God') || trimmedLine.includes('Father');
        // This handles short list items like "You are holy." or "Vastness of Creation"
        if (!isLikelyPrayer) {
-         return <p key={index} className="text-center text-lg my-2 leading-relaxed">{trimmedLine}</p>;
+         return <p key={index} className={`text-center text-lg ${spacing.pMargin} ${spacing.lineHeight}`}>{trimmedLine}</p>;
        }
     }
 
     // Default Rule: Scripture text, prayers, and longer sentences are italic.
-    return <p key={index} className="text-center text-lg my-2 italic leading-relaxed">{trimmedLine}</p>;
+    return <p key={index} className={`text-center text-lg italic ${spacing.pMargin} ${spacing.lineHeight}`}>{trimmedLine}</p>;
   }).filter(Boolean);
 
   return <>{content}</>;

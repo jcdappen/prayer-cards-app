@@ -21,27 +21,30 @@ const PrayerCard: React.FC<PrayerCardProps> = ({ card, isFlipped, onClick }) => 
       >
         {/* Front of Card */}
         <div className="absolute w-full h-full backface-hidden overflow-hidden flex flex-col bg-white shadow-lg">
-          <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider`}>
-            {card.category}
+          <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider truncate`}>
+            {card.frontHeadline}
           </div>
           <div className="flex-grow p-4 md:p-6 overflow-y-auto bg-base flex flex-col justify-center">
-            <CardContent text={card.front} />
+            <CardContent text={card.frontText} />
           </div>
           <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider`}>
-            {card.category} {card.id}
+             {card.category}
           </div>
         </div>
 
         {/* Back of Card */}
         <div className="absolute w-full h-full backface-hidden overflow-hidden flex flex-col bg-white shadow-lg rotate-y-180">
-          <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider`}>
-            {card.category}
+          <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider truncate`}>
+            {card.backHeadline}
           </div>
           <div className="flex-grow p-4 md:p-6 overflow-y-auto bg-base flex flex-col justify-center">
-            <CardContent text={card.back} />
+            {card.backTask && (
+                <p className="font-serif font-bold italic text-xl text-center my-4">{card.backTask}</p>
+            )}
+            <CardContent text={card.backText} />
           </div>
           <div className={`${cardColor} p-2 text-white text-center font-bold uppercase text-xs tracking-wider`}>
-            {card.category} {card.id}
+            {card.category}
           </div>
         </div>
       </div>
