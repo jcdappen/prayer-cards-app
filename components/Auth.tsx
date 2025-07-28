@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { auth } from '../firebaseClient';
 
 const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -7,42 +7,46 @@ const Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
 
   const handleAuthAction = async (action: 'signIn' | 'signUp') => {
     setLoading(true);
     setMessage('');
     setError('');
-    setDebugInfo('');
-    
-    console.log('Auth action started:', action);
-    console.log('Supabase URL:', supabase.supabaseUrl);
     
     try {
-      setDebugInfo('Attempting authentication...');
-      
-      const { data, error: authError } = action === 'signIn'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
-
-      console.log('Auth response:', { data, error: authError });
-      setDebugInfo(`Auth response: ${JSON.stringify({ user: data?.user?.id, session: !!data?.session })}`);
-
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw authError;
-      }
-
       if (action === 'signUp') {
+        await auth.createUserWithEmailAndPassword(email, password);
         setMessage('Sign up successful! You are now logged in.');
       } else {
+        await auth.signInWithEmailAndPassword(email, password);
         setMessage('Sign in successful!');
       }
-      
+      // The onAuthStateChanged listener in App.tsx will handle the redirect.
     } catch (err: any) {
-      console.error('Full error:', err);
-      setError(`Error: ${err.error_description || err.message || 'Unknown error'}`);
-      setDebugInfo(`Error details: ${JSON.stringify(err)}`);
+      console.error('Firebase Auth Error:', err);
+      // Make Firebase errors more user-friendly
+      let friendlyMessage = 'An unknown error occurred.';
+      if (err.code) {
+        switch (err.code) {
+          case 'auth/invalid-email':
+            friendlyMessage = 'Please enter a valid email address.';
+            break;
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+            friendlyMessage = 'Invalid email or password.';
+            break;
+          case 'auth/email-already-in-use':
+            friendlyMessage = 'An account with this email already exists.';
+            break;
+          case 'auth/weak-password':
+            friendlyMessage = 'The password must be at least 6 characters long.';
+            break;
+          default:
+            friendlyMessage = err.message;
+            break;
+        }
+      }
+      setError(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -58,7 +62,6 @@ const Auth: React.FC = () => {
 
         {message && <p className="text-center text-green-600 bg-green-50 p-3 rounded-md">{message}</p>}
         {error && <p className="text-center text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
-        {debugInfo && <p className="text-center text-blue-600 bg-blue-50 p-3 rounded-md text-xs">{debugInfo}</p>}
         
         <div className="space-y-6">
           <div>
@@ -109,53 +112,9 @@ const Auth: React.FC = () => {
             </button>
           </div>
         </div>
-        
-        {/* Debug-Informationen */}
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <p><strong>Supabase URL:</strong> {supabase.supabaseUrl}</p>
-          <p><strong>Current URL:</strong> {window.location.origin}</p>
-        </div>
       </div>
     </div>
   );
 };
 
 export default Auth;
-
-// Fügen Sie diesen Test zu Ihrer Auth.tsx hinzu (temporär)
-
-const testSupabaseConnection = async () => {
-  console.log('=== SUPABASE CONNECTION TEST ===');
-  console.log('URL:', supabase.supabaseUrl);
-  console.log('Window Location:', window.location.href);
-  
-  try {
-    // Test 1: Einfache Anmeldung
-    console.log('Testing signup...');
-    const { data, error } = await supabase.auth.signUp({
-      email: 'test123@gmail.com',
-      password: 'password123'
-    });
-    
-    console.log('Signup result:', { 
-      user: data?.user?.id || 'null',
-      session: data?.session ? 'exists' : 'null',
-      error: error?.message || 'none'
-    });
-    
-    if (error) {
-      console.error('Signup error details:', error);
-    }
-    
-  } catch (err) {
-    console.error('Connection error:', err);
-  }
-};
-
-// Button zu Ihrer Auth.tsx hinzufügen:
-<button 
-  onClick={testSupabaseConnection}
-  className="w-full px-4 py-2 font-bold text-gray-700 bg-yellow-200 rounded-md hover:bg-yellow-300"
->
-  🔧 Debug Test
-</button>

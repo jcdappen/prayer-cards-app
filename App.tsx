@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { initialPrayerCards } from './data';
 import { CATEGORIES } from './constants';
@@ -7,8 +6,8 @@ import CategoryTile from './components/CategoryTile';
 import PrayerCard from './components/PrayerCard';
 import CreateCardForm from './components/CreateCardForm';
 import Auth from './components/Auth';
-import { supabase } from './supabaseClient';
-import type { Session } from '@supabase/supabase-js';
+import { auth } from './firebaseClient';
+import type { User } from 'firebase/auth';
 
 import ArrowLeftIcon from './components/icons/ArrowLeftIcon';
 import ArrowRightIcon from './components/icons/ArrowRightIcon';
@@ -17,7 +16,7 @@ import ShuffleIcon from './components/icons/ShuffleIcon';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
-  const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
   const [cards, setCards] = useState<PrayerCardType[]>(initialPrayerCards);
@@ -27,42 +26,36 @@ const App: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
-  const fetchUserCards = useCallback(async (token: string) => {
+  const fetchUserCards = useCallback(async (user: User) => {
     setStatusMessage('Loading your cards...');
     try {
+      const token = await user.getIdToken();
       const response = await fetch('/.netlify/functions/get-cards', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to fetch cards');
       const userCards = await response.json();
       setCards([...initialPrayerCards, ...userCards]);
-      setStatusMessage('');
     } catch (error) {
       console.error(error);
       setStatusMessage('Error loading cards.');
+    } finally {
+      setStatusMessage('');
     }
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchUserCards(session.access_token);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+      if (user) {
+        fetchUserCards(user);
       } else {
+        // When user logs out, reset cards to initial state
         setCards(initialPrayerCards);
       }
       setLoading(false);
     });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (session) {
-            fetchUserCards(session.access_token);
-        }
-        setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, [fetchUserCards]);
 
 
@@ -135,16 +128,17 @@ const App: React.FC = () => {
   };
 
   const handleCreateCard = async (newCardData: { front: string; back: string }) => {
-    if (!session) return alert("Please log in to create a card.");
+    if (!currentUser) return alert("Please log in to create a card.");
     setStatusMessage('Saving card...');
     try {
+        const token = await currentUser.getIdToken();
         const response = await fetch('/.netlify/functions/create-card', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${session.access_token}` },
+            headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify(newCardData),
         });
         if (!response.ok) throw new Error('Failed to create card');
-        await fetchUserCards(session.access_token);
+        await fetchUserCards(currentUser);
         setView('category');
         setSelectedCategoryName('MY CARDS');
     } catch (error) {
@@ -158,16 +152,17 @@ const App: React.FC = () => {
   };
 
   const handleUpdateCard = async (updatedData: { front: string; back: string }) => {
-    if (!selectedCardId || !session) return;
+    if (!selectedCardId || !currentUser) return;
     setStatusMessage('Updating card...');
     try {
+        const token = await currentUser.getIdToken();
         const response = await fetch('/.netlify/functions/update-card', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${session.access_token}` },
+            headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ cardId: selectedCardId, ...updatedData }),
         });
         if (!response.ok) throw new Error('Failed to update card');
-        await fetchUserCards(session.access_token);
+        await fetchUserCards(currentUser);
         setView('card');
     } catch (error) {
         console.error(error);
@@ -176,19 +171,19 @@ const App: React.FC = () => {
   };
 
   const handleDeleteCard = async () => {
-    if (!currentCard || typeof currentCard.id !== 'string' || !session) return;
+    if (!currentCard || typeof currentCard.id !== 'string' || !currentUser) return;
     if (window.confirm("Are you sure you want to delete this card?")) {
         setStatusMessage('Deleting card...');
         try {
+            const token = await currentUser.getIdToken();
             const response = await fetch('/.netlify/functions/delete-card', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${session.access_token}` },
+                headers: { Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ cardId: currentCard.id }),
             });
             if (!response.ok) throw new Error('Failed to delete card');
-            await fetchUserCards(session.access_token);
-            setView('category');
-            setSelectedCardId(null);
+            await fetchUserCards(currentUser);
+            handleBack();
         } catch(error) {
             console.error(error);
             setStatusMessage('Error deleting card.');
@@ -197,7 +192,7 @@ const App: React.FC = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     handleGoHome();
   };
   
@@ -206,14 +201,14 @@ const App: React.FC = () => {
         const nextCard = currentCategoryCards[currentCardIndex + 1];
         handleSelectCard(nextCard.id, nextCard.category);
     }
-  }, [currentCardIndex, currentCategoryCards]);
+  }, [currentCardIndex, currentCategoryCards, handleSelectCard]);
   
   const handlePrevCard = useCallback(() => {
     if(currentCardIndex > 0){
         const prevCard = currentCategoryCards[currentCardIndex - 1];
         handleSelectCard(prevCard.id, prevCard.category);
     }
-  }, [currentCardIndex, currentCategoryCards]);
+  }, [currentCardIndex, currentCategoryCards, handleSelectCard]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -231,16 +226,20 @@ const App: React.FC = () => {
     return <div className="flex justify-center items-center h-screen"><div>Loading...</div></div>;
   }
 
-  if (!session) {
+  if (!currentUser) {
     return <Auth />;
   }
 
   const renderHome = () => (
     <div className="p-4 md:p-8">
       <header className="text-center mb-8 relative">
+        <div className="absolute top-0 right-0 text-right">
+          <p className="text-sm text-gray-600">Signed in as</p>
+          <p className="font-semibold text-gray-800">{currentUser.email}</p>
+          <button onClick={handleSignOut} className="mt-1 text-sm bg-red-500 text-white py-1 px-3 rounded-md hover:bg-red-600">Sign Out</button>
+        </div>
         <h1 className="font-serif text-5xl font-bold text-sky-800">Lead With Prayer</h1>
         <p className="text-lg text-gray-600 mt-2">Digital Prayer Cards</p>
-        <button onClick={handleSignOut} className="absolute top-0 right-0 bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600">Sign Out</button>
       </header>
       
        <div className="flex justify-center gap-4 my-8">

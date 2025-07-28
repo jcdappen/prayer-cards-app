@@ -1,154 +1,45 @@
 import type { Handler } from "@netlify/functions";
-import { createClient } from '@supabase/supabase-js';
+import { db, auth } from './_firebase-admin';
 
-type CardsRow = {
-  back: string;
-  category: string;
-  created_at: string;
-  front: string;
-  id: string;
-  user_id: string;
-};
-
-type CardsInsert = {
-  back: string;
-  category: string;
-  created_at?: string;
-  front: string;
-  id?: string;
-  user_id: string;
-};
-
-type CardsUpdate = {
-  back?: string;
-  category?: string;
-  created_at?: string;
-  front?: string;
-  id?: string;
-  user_id?: string;
-};
-
-export type Database = {
-  public: {
-    Tables: {
-      cards: {
-        Row: CardsRow;
-        Insert: CardsInsert;
-        Update: CardsUpdate;
-      };
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-};
-
-const handler: Handler = async (event, context) => {
-  // CORS Headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
-
-  // Handle preflight requests
+const handler: Handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+    return { statusCode: 204, body: '' };
   }
 
-  // Check for Authorization header
-  const authHeader = event.headers.authorization || event.headers.Authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { 
-      statusCode: 401, 
-      headers,
-      body: JSON.stringify({ error: 'Missing or invalid authorization header' }) 
-    };
+  const authHeader = event.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ') || !event.body) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized or missing body' }) };
   }
-
-  const token = authHeader.replace('Bearer ', '');
-  
-  if (!event.body) {
-    return { 
-      statusCode: 400, 
-      headers,
-      body: JSON.stringify({ error: 'Request body missing' }) 
-    };
-  }
-
-  // Initialize Supabase client
-  const supabase = createClient<Database>(
-    process.env.SUPABASE_URL!, 
-    process.env.SUPABASE_SERVICE_KEY!
-  );
 
   try {
-    // Verify the JWT token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return { 
-        statusCode: 401, 
-        headers,
-        body: JSON.stringify({ error: 'Invalid token or user not found' }) 
-      };
-    }
+    const token = authHeader.replace('Bearer ', '');
+    const decodedToken = await auth.verifyIdToken(token);
+    const uid = decodedToken.uid;
 
-    // Parse request body
-    const { cardId, front, back }: { cardId: string; front: string; back: string; } = JSON.parse(event.body);
+    const { cardId, front, back } = JSON.parse(event.body);
 
     if (!cardId) {
-      return { 
-        statusCode: 400, 
-        headers,
-        body: JSON.stringify({ error: 'Card ID is required' }) 
-      };
+        return { statusCode: 400, body: JSON.stringify({ error: 'Card ID is required' }) };
     }
 
-    // Update card
-    const { data, error } = await supabase
-      .from('cards')
-      .update({ front, back })
-      .eq('id', cardId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+    const cardRef = db.collection('cards').doc(cardId);
+    const doc = await cardRef.get();
 
-    if (error) {
-      console.error('Database error:', error);
-      return { 
-        statusCode: 500, 
-        headers,
-        body: JSON.stringify({ error: error.message }) 
-      };
+    if (!doc.exists || doc.data()?.userId !== uid) {
+        return { statusCode: 404, body: JSON.stringify({ error: 'Card not found or permission denied' }) };
     }
+
+    await cardRef.update({ front, back });
+
+    const updatedDoc = await cardRef.get();
 
     return { 
-      statusCode: 200, 
-      headers,
-      body: JSON.stringify(data) 
+        statusCode: 200, 
+        body: JSON.stringify({ id: updatedDoc.id, ...updatedDoc.data() }) 
     };
-
   } catch (error) {
-    console.error('Function error:', error);
-    return { 
-      statusCode: 500, 
-      headers,
-      body: JSON.stringify({ error: 'Internal server error' }) 
-    };
+    console.error('Error updating card:', error);
+    return { statusCode: 500, body: JSON.stringify({ error: 'Internal Server Error' }) };
   }
 };
 
